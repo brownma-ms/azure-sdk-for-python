@@ -3,6 +3,7 @@ import os
 import mock
 import pytest
 
+from unittest import mock
 from azure.ai.ml._azure_environments import (
     AzureEnvironments,
     _get_azure_portal_id_from_metadata,
@@ -12,6 +13,8 @@ from azure.ai.ml._azure_environments import (
     _get_registry_discovery_endpoint_from_metadata,
     _get_storage_endpoint_from_metadata,
     _set_cloud,
+    _get_all_clouds,
+    _get_clouds_by_metadata_url,
 )
 from azure.ai.ml.constants._common import AZUREML_CLOUD_ENV_NAME
 
@@ -89,3 +92,43 @@ class TestCloudEnvironments:
         _set_cloud(cloud_environment)
         base_url = _get_registry_discovery_endpoint_from_metadata(cloud_environment)
         assert "https://usgovarizona.api.ml.azure.us/" in base_url
+
+    @mock.patch('azure.ai.ml._azure_environments.requests.get')
+    def test_get_cloud_from_arm(self, mock_get):
+        mock_get.return_value.status_code = 201
+        mock_get.return_value.json.return_value = [{
+            "name": "TEST_ENV", 
+            "portal": "testportal", 
+            "resourceManager": "testresourcemanager",
+            "authentication": {
+                "loginEndpoint": "testdirectoryendpoint"
+            },
+            "resourceManager": "testresourcemanager",
+            "suffixes": {
+                "storage": "teststorageendpoint"
+            }
+        }]
+        _set_cloud('TEST_ENV')
+        cloud_details = _get_cloud_information_from_metadata("TEST_ENV")
+        assert cloud_details.get("cloud") == "TEST_ENV"
+    
+    @patch('_azure_environments.requests.get')
+    def test_arm_misconfigured(self, mock_get):
+        mock_post.return_value.status_code = 201
+        mock_post.return_value.json.return_value = [{
+            "name": "TEST_ENV", 
+            "portal": "testportal", 
+            "resourceManager": "testresourcemanager",
+            "authentication": {
+                "loginEndpoint": "testdirectoryendpoint"
+            },
+            "resourceManager": "testresourcemanager",
+            "suffixes": {
+                "storage": "teststorageendpoint"
+            }
+        },
+        {
+            "name": "MISCONFIGURED"
+        }]
+        _set_cloud("MISCONFIGURED")
+        assert os.environ[AZUREML_CLOUD_ENV_NAME] != "MISCONFIGURED"
