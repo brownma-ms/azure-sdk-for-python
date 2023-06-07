@@ -312,3 +312,23 @@ stages:
               - metadata/
             PackageSourceOverride: ${{parameters.PackageSourceOverride}}
             DocValidationImageId: ${{parameters.DocValidationImageId}}
+    - job: CompressDependencies
+      displayName: "Collect and compress dependencies"
+      condition: or(eq(variables['SetDevVersion'], 'true'), and(eq(variables['Build.Reason'],'Schedule'), eq(variables['System.TeamProject'], 'internal')))
+      pool:
+        name: azsdk-pool-mms-ubuntu-2004-general
+        vmImage: MMSUbuntu20.04
+      steps:
+      - checkout: none
+      - download: current
+        artifact: ${{parameters.ArtifactName}}
+        timeoutInMinutes: 5
+      - script: |
+          set -e
+          python -m pip install piprepo
+        displayName: Install Piprepo tool
+      - task: PythonScript@0
+        inputs:
+          scriptSource: 'filePath'
+          scriptPath: '../../scripts/compress_dependencies.py'
+          arguments: '${{parameters.ArtifactName}}'
